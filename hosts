@@ -1,0 +1,5 @@
+[poc_host]
+localhost ansible_connection=local
+
+[all:children]
+localhost

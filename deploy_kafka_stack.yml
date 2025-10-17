@@ -1,0 +1,29 @@
+---
+- name: 🚀 IMPLANTAR STACK KAFKA (KRaft)
+  hosts: localhost
+  become: yes
+
+  tasks:
+    # Apenas garantir a existência da pasta local antes de montar o volume
+    - name: 📁 Criar diretório de dados do Kafka
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/kafka_data"
+        state: directory
+        mode: '0755'
+        
+    # Inicia a Stack Docker Compose V2
+    - name: 🐳 Iniciar a Stack Docker Compose (Kafka, UI, API)
+      community.docker.docker_compose_v2:
+        project_src: "{{ playbook_dir }}" 
+        files:
+          - docker-compose.yml
+        state: present
+        project_name: kafka_poc
+        
+    - name: 🌐 Exibir status de acesso
+      ansible.builtin.debug:
+        msg: |
+          Cluster Kafka (KRaft) iniciado com sucesso.
+          Acesso ao UI: http://localhost:8080
+          Acesso ao Broker (Host): localhost:9094
+          Acesso à API: http://localhost:5000

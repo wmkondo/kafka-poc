@@ -1,0 +1,13 @@
+# Ambientes Virtuais Python
+venv/
+.venv/
+__pycache__/
+
+# Logs e Dados do Docker
+*.log
+volumes/
+kafka_data/ # O nome do seu volume persistente
+.DS_Store
+
+# IDEs e Ferramentas
+.vscode/

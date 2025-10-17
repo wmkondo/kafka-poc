@@ -1,0 +1,78 @@
+services:
+  # 1. Container principal do Kafka (usando KRaft)
+  kafka:
+    # Imagem estável e robusta para Docker-Compose
+    image: confluentinc/cp-kafka:7.6.0 
+    container_name: kafka-broker
+    
+    # A porta 9094 é mapeada para acesso EXTERNO (Host/Python)
+    ports:
+      - "9094:9094" 
+      
+    volumes:
+      # Volume mapeado para persistência de dados
+      - kafka_data:/var/lib/kafka/data
+      
+    environment:
+      # --- CONFIGURAÇÃO KRaft/Confluent CRÍTICA ---
+      CLUSTER_ID: 'Y-t_TjR9Q3GFuYt28wDq8A'
+      KAFKA_CLUSTER_ID: 'Y-t_TjR9Q3GFuYt28wDq8A'
+      
+      # Configurações KRaft de Nó Único (Broker e Controller)
+      KAFKA_BROKER_ID: 1
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      
+      # ** CORREÇÃO CHAVE: KAFKA_CFG_ para o listener do Controller **
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+
+      # *** Configurações de Listeners ***
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      
+      # Define as portas e nomes dos listeners
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:9092,EXTERNAL://:9094 
+      
+      # Anuncia os endereços
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9094
+      
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+
+      # Configurações de Otimização
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+    healthcheck:
+      # Testa o listener EXTERNAL para garantir que o serviço está UP
+      test: [ "CMD", "nc", "-z", "localhost", "9094" ] 
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Interface Web para Visualização
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: 'Meu Cluster PoC' 
+      # Conecta-se ao listener INTERNAL do Kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: 'kafka:9092'
+    depends_on:
+      kafka:
+        condition: service_healthy # Espera o Kafka estar saudável (UP)
+
+  # 3. API Python para rodar Producer/Consumer
+  python-api:
+    build: . # Assume que você tem um Dockerfile no diretório atual
+    container_name: python-api-poc
+    ports:
+      - "5000:5000"
+    depends_on:
+      - kafka
+
+volumes:
+  kafka_data:
+    driver: local

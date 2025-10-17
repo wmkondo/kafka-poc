@@ -1,0 +1,26 @@
+# Arquivo: poc_tests.http
+
+@host = http://localhost:5000
+
+### Teste 1: Health Check (Rota Raiz)
+# Verifica se a API está rodando. Assumindo que a rota raiz ('/') está funcional (pelo menos um 200 OK).
+
+GET {{host}}/
+Content-Type: application/json
+
+###
+
+### Teste 2: PRODUCE - Enviar 5 Mensagens para o Tópico 'primeiro_topico'
+# Este endpoint é um POST que não espera BODY, ele produz 5 mensagens internamente.
+
+POST {{host}}/produce
+Content-Type: application/json
+
+###
+
+### Teste 3: CONSUME - Obter as Mensagens do Tópico 'primeiro_topico'
+# Este endpoint está configurado para ler desde o início ('earliest')
+# Ele deve retornar o array 'messages_read' com as 5 mensagens enviadas no Teste 2.
+
+GET {{host}}/consume
+Content-Type: application/json

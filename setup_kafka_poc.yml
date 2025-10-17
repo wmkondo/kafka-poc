@@ -1,0 +1,91 @@
+---
+- name: 🐋 Configuração Completa do POC Kafka (KRaft, Kafka UI, Python API e Portainer)
+  # Se você estiver rodando na sua própria máquina, troque 'seu_host_docker' por 'localhost' ou 'all'
+  hosts: seu_host_docker 
+  become: yes # Para instalar pacotes e gerenciar o Docker
+
+  vars:
+    project_dir: /opt/kafka-poc
+    host_user: seu_usuario # Mude para o seu usuário SSH (Ex: weber)
+
+  tasks:
+    # -----------------------------------------------------------------
+    # BLOC 1: PRÉ-REQUISITOS E DEPENDÊNCIAS
+    # -----------------------------------------------------------------
+    - name: Garantir que o Docker e o módulo Python do Compose estejam instalados
+      ansible.builtin.apt:
+        name: 
+          - docker.io
+          - python3-pip
+        state: present
+        update_cache: yes
+      tags: [prereq]
+
+    - name: Instalar dependências Python (docker) para Ansible (necessário para os módulos community.docker)
+      ansible.builtin.pip:
+        name: docker
+        state: present
+      tags: [prereq]
+      
+    # Nota: A coleção 'community.docker' deve ser instalada manualmente via 'ansible-galaxy collection install community.docker'
+
+    # -----------------------------------------------------------------
+    # BLOC 2: IMPLANTAR O PORTAINER (Ferramenta de Gerenciamento)
+    # -----------------------------------------------------------------
+    - name: Criar volume persistente para Portainer
+      community.docker.docker_volume:
+        name: portainer_data
+      tags: [portainer]
+
+    - name: Iniciar o Portainer CE na porta 9000
+      community.docker.docker_container:
+        name: portainer
+        image: portainer/portainer-ce:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "9000:9000"
+        volumes:
+          - /var/run/docker.sock:/var/run/docker.sock
+          - portainer_data:/data
+      tags: [portainer]
+
+    # -----------------------------------------------------------------
+    # BLOC 3: IMPLANTAR O STACK KAFKA (Kafka, UI, Python API)
+    # -----------------------------------------------------------------
+    - name: Criar diretório do projeto Kafka
+      ansible.builtin.file:
+        path: "{{ project_dir }}"
+        state: directory
+        owner: "{{ host_user }}" 
+        group: "{{ host_user }}"
+        mode: '0755'
+      tags: [kafka-stack]
+
+    - name: Copiar todos os arquivos de configuração (docker-compose, Dockerfile, etc.)
+      ansible.builtin.copy:
+        src: files/
+        dest: "{{ project_dir }}/"
+        owner: "{{ host_user }}"
+        group: "{{ host_user }}"
+        mode: '0644'
+      tags: [kafka-stack]
+
+    # CORREÇÃO CRÍTICA: Uso do novo módulo docker_compose_v2
+    - name: Subir o stack Docker Compose (Isso fará o 'docker compose up -d --build')
+      community.docker.docker_compose_v2:
+        project_src: "{{ project_dir }}"
+        state: present
+        # O Ansible fará o rebuild da imagem da API Python se o Dockerfile/código tiver mudado
+      tags: [kafka-stack]
+
+- name: 📢 Verificação Final
+  hosts: seu_host_docker
+  tasks:
+    - name: Exibir URLs de acesso
+      ansible.builtin.debug:
+        msg: 
+          - "Configuração concluída com sucesso. Verifique os serviços:"
+          - "Portainer URL (Gerenciamento): http://{{ ansible_host | default('localhost') }}:9000"
+          - "Kafka UI URL (Monitoramento): http://{{ ansible_host | default('localhost') }}:8080"
+          - "Python API URL (Producer/Consumer Teste): http://{{ ansible_host | default('localhost') }}:5000"
